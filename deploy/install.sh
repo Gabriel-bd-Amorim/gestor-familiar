@@ -49,9 +49,12 @@ command -v docker >/dev/null 2>&1 || die "docker nao encontrado."
 docker compose version >/dev/null 2>&1 || die "docker compose v2 nao encontrado."
 
 if [ -z "$APP_URL" ]; then
-  HOST_IP="$(hostname -I 2>/dev/null | awk '{print $1}')"
+  # No ZimaOS o primeiro endereco de `hostname -I` costuma ser 127.0.0.1, o que
+  # geraria um APP_URL inutil para os usuarios da rede. Preferimos o IPv4 da LAN.
+  HOST_IP="$(hostname -I 2>/dev/null | tr ' ' '\n' | grep -E '^[0-9]+\.' | grep -v '^127\.' | head -1)"
   [ -n "$HOST_IP" ] || HOST_IP="127.0.0.1"
   APP_URL="http://$HOST_IP:$APP_PORT"
+  log "APP_URL detectado: $APP_URL (defina APP_URL=... para sobrescrever)."
 fi
 
 mkdir -p "$(dirname "$APP_DIR")"
