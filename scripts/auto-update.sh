@@ -62,11 +62,23 @@ set -a
 set +a
 
 # Backup do banco antes de qualquer migracao, para permitir rollback.
+# A limpeza e nada mais que higiene: nunca pode impedir a atualizacao.
+prune_backups() {
+  # O ZimaOS nao traz xargs, entao a contagem roda em shell puro.
+  kept=0
+  for dump in $(ls -1t "$BACKUP_DIR"/pre-update-*.dump 2>/dev/null); do
+    kept=$((kept + 1))
+    if [ "$kept" -gt "$KEEP_BACKUPS" ]; then
+      rm -f "$dump"
+    fi
+  done
+}
+
 mkdir -p "$BACKUP_DIR"
 STAMP="$(date '+%Y%m%d-%H%M%S')"
 if docker compose exec -T postgres pg_dump -U "${POSTGRES_USER:-familia_app}" "${POSTGRES_DB:-familia}" 2>/dev/null | gzip >"$BACKUP_DIR/pre-update-$STAMP.dump"; then
   log "Backup salvo em backups/pre-update-$STAMP.dump"
-  ls -1t "$BACKUP_DIR"/pre-update-*.dump 2>/dev/null | tail -n "+$((KEEP_BACKUPS + 1))" | xargs -r rm -f
+  prune_backups || log "AVISO: nao foi possivel limpar backups antigos."
 else
   log "AVISO: backup do banco falhou; seguindo com a atualizacao."
   rm -f "$BACKUP_DIR/pre-update-$STAMP.dump"
