@@ -1,8 +1,24 @@
 #!/bin/sh
 # Instala o Gestor Familiar no host (ZimaOS/CasaOS) e ativa a atualizacao automatica.
 # Uso:  sh deploy/install.sh
-# Requer: git, docker com compose v2, openssl.
+# Requer: git, docker com compose v2, coreutils (od, tr, head).
 set -eu
+
+# O compose v2 e o crontab exigem root; reexecuta com sudo se necessario.
+if [ "$(id -u)" -ne 0 ]; then
+  command -v sudo >/dev/null 2>&1 || {
+    printf '[instalador] ERRO: rode como root ou instale o sudo.\n' >&2
+    exit 1
+  }
+  log() { printf '[instalador] %s\n' "$*"; }
+  log "Permissao root necessaria; repetindo com sudo."
+  exec sudo -p '[instalador] senha do sudo: ' env \
+    REPO_URL="$REPO_URL" BRANCH="$BRANCH" APP_DIR="$APP_DIR" APP_PORT="$APP_PORT" \
+    APP_BIND="$APP_BIND" APP_URL="$APP_URL" TZ_NAME="$TZ_NAME" \
+    CRON_SCHEDULE="$CRON_SCHEDULE" ADMIN_USERNAME="$ADMIN_USERNAME" \
+    INITIAL_ADMIN_PASSWORD="${INITIAL_ADMIN_PASSWORD:-}" \
+    sh "$0" "$@"
+fi
 
 REPO_URL="${REPO_URL:-https://github.com/Gabriel-bd-Amorim/gestor-familiar}"
 BRANCH="${BRANCH:-main}"
@@ -16,6 +32,10 @@ ADMIN_USERNAME="${ADMIN_USERNAME:-admin}"
 
 log() { printf '[instalador] %s\n' "$*"; }
 die() { printf '[instalador] ERRO: %s\n' "$*" >&2; exit 1; }
+
+# ZimaOS nao traz openssl; /dev/urandom com od cobre os dois casos.
+rand_hex() { head -c "$1" /dev/urandom | od -An -tx1 | tr -d ' \n'; }
+rand_pass() { head -c 24 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | cut -c1-16; }
 
 command -v git >/dev/null 2>&1 || die "git nao encontrado."
 command -v docker >/dev/null 2>&1 || die "docker nao encontrado."
@@ -46,12 +66,12 @@ if [ -f .env ]; then
   log ".env existente preservado."
 else
   log "Gerando .env com segredos aleatorios."
-  POSTGRES_PASSWORD="$(openssl rand -hex 24)"
-  AUTH_SECRET="$(openssl rand -hex 32)"
+  POSTGRES_PASSWORD="$(rand_hex 24)"
+  AUTH_SECRET="$(rand_hex 32)"
   if [ -n "${INITIAL_ADMIN_PASSWORD:-}" ]; then
     ADMIN_PASSWORD="$INITIAL_ADMIN_PASSWORD"
   else
-    ADMIN_PASSWORD="$(openssl rand -base64 12 | tr -d '/+=' | cut -c1-16)"
+    ADMIN_PASSWORD="$(rand_pass)"
   fi
 
   umask 077
