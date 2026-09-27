@@ -82,9 +82,12 @@ APP_PORT=3210 INITIAL_ADMIN_PASSWORD='sua-senha' sh deploy/install.sh
 Acompanhar e forçar uma atualização:
 
 ```sh
+sh deploy/status.sh
 tail -f /var/log/gestor-familiar-autoupdate.log
 APP_DIR=/DATA/AppData/gestor-familiar sh scripts/auto-update.sh
 ```
+
+`deploy/status.sh` compara o commit do servidor com o do GitHub, mostra a saúde do contêiner, a URL, os backups e as últimas linhas do log de atualização.
 
 O `.env` e `backups/` são ignorados pelo Git, então `git reset --hard` durante a atualização nunca apaga segredos nem dumps do banco. Para desativar a atualização automática, remova a linha do `crontab` que menciona `scripts/auto-update.sh`.
 
@@ -127,7 +130,7 @@ prisma/               Modelo e migrações versionadas
 scripts/              Inicialização, configuração, ícones, backup e auto-update
 tests/                Regras financeiras, integração e navegação Firefox
 public/               Ícones PWA
-deploy/               Instalador do ZimaOS com atualização automática
+deploy/               Instalador e consulta de estado do ZimaOS
 compose.yaml          Ambiente principal
 compose.test.yaml     Integração isolada
 compose.browser.yaml  Ambiente descartável de navegação
