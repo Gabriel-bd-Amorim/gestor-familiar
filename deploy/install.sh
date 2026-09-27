@@ -4,19 +4,26 @@
 # Requer: git, docker com compose v2, coreutils (od, tr, head).
 set -eu
 
+# O ZimaOS monta /root somente para leitura, e o Docker aborta o build ao tentar
+# criar $HOME/.docker. Apontamos DOCKER_CONFIG para um diretorio gravavel em /DATA
+# antes de qualquer comando docker, inclusive atraves do sudo.
+DOCKER_CONFIG="${DOCKER_CONFIG:-/DATA/Docker/.config-gestor}"
+export DOCKER_CONFIG
+mkdir -p "$DOCKER_CONFIG" 2>/dev/null || DOCKER_CONFIG=/tmp/.config-gestor
+export DOCKER_CONFIG
+
 # O compose v2 e o crontab exigem root; reexecuta com sudo se necessario.
 if [ "$(id -u)" -ne 0 ]; then
   command -v sudo >/dev/null 2>&1 || {
     printf '[instalador] ERRO: rode como root ou instale o sudo.\n' >&2
     exit 1
   }
-  log() { printf '[instalador] %s\n' "$*"; }
-  log "Permissao root necessaria; repetindo com sudo."
+  printf '[instalador] Permissao root necessaria; repetindo com sudo.\n'
   exec sudo -p '[instalador] senha do sudo: ' env \
-    REPO_URL="$REPO_URL" BRANCH="$BRANCH" APP_DIR="$APP_DIR" APP_PORT="$APP_PORT" \
-    APP_BIND="$APP_BIND" APP_URL="$APP_URL" TZ_NAME="$TZ_NAME" \
-    CRON_SCHEDULE="$CRON_SCHEDULE" ADMIN_USERNAME="$ADMIN_USERNAME" \
-    INITIAL_ADMIN_PASSWORD="${INITIAL_ADMIN_PASSWORD:-}" \
+    REPO_URL="${REPO_URL:-}" BRANCH="${BRANCH:-}" APP_DIR="${APP_DIR:-}" APP_PORT="${APP_PORT:-}" \
+    APP_BIND="${APP_BIND:-}" APP_URL="${APP_URL:-}" TZ_NAME="${TZ_NAME:-}" \
+    CRON_SCHEDULE="${CRON_SCHEDULE:-}" ADMIN_USERNAME="${ADMIN_USERNAME:-}" \
+    INITIAL_ADMIN_PASSWORD="${INITIAL_ADMIN_PASSWORD:-}" DOCKER_CONFIG="$DOCKER_CONFIG" \
     sh "$0" "$@"
 fi
 

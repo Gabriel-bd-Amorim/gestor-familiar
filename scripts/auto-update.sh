@@ -10,6 +10,14 @@ LOCK_FILE="${LOCK_FILE:-/tmp/gestor-familiar-autoupdate.lock}"
 BACKUP_DIR="${BACKUP_DIR:-$APP_DIR/backups}"
 KEEP_BACKUPS="${KEEP_BACKUPS:-10}"
 
+# O ZimaOS monta /root somente para leitura; sem isto o docker aborta o build
+# ao tentar criar $HOME/.docker. O cron tambem roda com um HOME minimo, entao o
+# diretorio precisa vir de fora.
+DOCKER_CONFIG="${DOCKER_CONFIG:-/DATA/Docker/.config-gestor}"
+export DOCKER_CONFIG
+mkdir -p "$DOCKER_CONFIG" 2>/dev/null || DOCKER_CONFIG=/tmp/.config-gestor
+export DOCKER_CONFIG
+
 log() {
   printf '%s %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >>"$LOG_FILE"
 }
