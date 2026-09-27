@@ -124,6 +124,8 @@ log "Registrando atualizacao automatica no cron: $CRON_SCHEDULE"
 CRON_LINE="$CRON_SCHEDULE APP_DIR=$APP_DIR BRANCH=$BRANCH LOG_FILE=/var/log/gestor-familiar-autoupdate.log sh $APP_DIR/scripts/auto-update.sh >/dev/null 2>&1"
 ( crontab -l 2>/dev/null | grep -vF 'scripts/auto-update.sh' || true; echo "$CRON_LINE" ) | crontab -
 
-log "Servico disponivel em $APP_URL"
+# Com um .env preexistente o APP_URL acima pode nao ser o que vale no container.
+EFFECTIVE_URL="$(sed -n 's/^APP_URL=//p' .env | head -1)"
+log "Servico disponivel em ${EFFECTIVE_URL:-$APP_URL}"
 log "Para acompanhar:  docker compose -f $APP_DIR/compose.yaml logs -f app"
 log "Log de atualizacoes:  tail -f /var/log/gestor-familiar-autoupdate.log"
