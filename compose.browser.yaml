@@ -1,0 +1,42 @@
+# Ambiente descartável para verificação manual, nunca use estas credenciais em produção.
+name: entrecontas-browser
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: test
+      POSTGRES_PASSWORD: test-only-password
+      POSTGRES_DB: entrecontas_test
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U test -d entrecontas_test"]
+      interval: 2s
+      timeout: 5s
+      retries: 20
+  migrate:
+    build:
+      context: .
+      target: migrate
+    environment:
+      DATABASE_URL: postgresql://test:test-only-password@postgres:5432/entrecontas_test
+      AUTH_SECRET: browser-test-secret-not-for-production-2026
+      INITIAL_ADMIN_USERNAME: admin
+      INITIAL_ADMIN_PASSWORD: TestOnlyPassword2026
+    depends_on:
+      postgres:
+        condition: service_healthy
+  app:
+    build:
+      context: .
+      target: runner
+    environment:
+      DATABASE_URL: postgresql://test:test-only-password@postgres:5432/entrecontas_test
+      AUTH_SECRET: browser-test-secret-not-for-production-2026
+      APP_URL: http://localhost:3101
+      TZ: America/Sao_Paulo
+    ports:
+      - "127.0.0.1:3101:3000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully

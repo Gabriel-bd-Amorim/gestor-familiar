@@ -1,0 +1,129 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                 String    @id @default(cuid())
+  username           String    @unique
+  name               String
+  passwordHash       String
+  admin              Boolean   @default(false)
+  active             Boolean   @default(true)
+  mustChangePassword Boolean   @default(true)
+  createdAt          DateTime  @default(now())
+  sessions           Session[]
+  accounts           Account[]
+  ownedEntries       Entry[]   @relation("owner")
+  debts              Entry[]   @relation("debtor")
+  payments           Payment[] @relation("payer")
+  reversals          Payment[] @relation("reverser")
+  audits             Audit[]
+  messages           AiMessage[]
+}
+
+model Session {
+  id        String   @id
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model LoginLimit {
+  username String @id
+  attempts Int
+  since    DateTime
+}
+
+model Account {
+  id      String @id @default(cuid())
+  ownerId String
+  owner   User @relation(fields: [ownerId], references: [id])
+  name    String
+  kind    String
+  entries Entry[]
+  @@unique([ownerId, name])
+}
+
+model Entry {
+  id            String @id @default(cuid())
+  ownerId       String
+  owner         User @relation("owner", fields: [ownerId], references: [id])
+  debtorId      String?
+  debtor        User? @relation("debtor", fields: [debtorId], references: [id])
+  description   String
+  category      String
+  notes         String @default("")
+  purchaseDate  DateTime @db.Date
+  accountId     String?
+  account       Account? @relation(fields: [accountId], references: [id])
+  sourceId      String? @unique
+  source        Entry? @relation("source", fields: [sourceId], references: [id])
+  shared        Entry? @relation("source")
+  totalCents    Int
+  count         Int
+  startNumber   Int
+  cancelledAt   DateTime?
+  createdAt     DateTime @default(now())
+  installments  Installment[]
+  audits        Audit[]
+  @@index([ownerId, createdAt])
+  @@index([debtorId, createdAt])
+}
+
+model Installment {
+  id        String @id @default(cuid())
+  entryId   String
+  entry     Entry @relation(fields: [entryId], references: [id])
+  number    Int
+  dueDate   DateTime @db.Date
+  cents     Int
+  payments  Payment[]
+  @@unique([entryId, number])
+  @@index([dueDate])
+}
+
+model Payment {
+  id            String @id @default(cuid())
+  installmentId String
+  installment   Installment @relation(fields: [installmentId], references: [id])
+  actorId       String
+  actor         User @relation("payer", fields: [actorId], references: [id])
+  requestKey    String @unique
+  cents         Int
+  note          String @default("")
+  paidAt        DateTime @db.Date
+  createdAt     DateTime @default(now())
+  reversedAt    DateTime?
+  reversedById  String?
+  reversedBy    User? @relation("reverser", fields: [reversedById], references: [id])
+  reversalNote  String?
+  @@index([installmentId])
+}
+
+model Audit {
+  id        String @id @default(cuid())
+  entryId   String
+  entry     Entry @relation(fields: [entryId], references: [id])
+  actorId   String
+  actor     User @relation(fields: [actorId], references: [id])
+  message   String
+  createdAt DateTime @default(now())
+  @@index([entryId, createdAt])
+}
+
+model AiMessage {
+  id        String @id @default(cuid())
+  userId    String
+  user      User @relation(fields: [userId], references: [id])
+  question  String
+  answer    String?
+  createdAt DateTime @default(now())
+  @@index([userId, createdAt])
+}

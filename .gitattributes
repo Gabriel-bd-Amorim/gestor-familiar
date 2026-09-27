@@ -1,0 +1,15 @@
+# Normaliza LF no repositorio e no checkout para que os scripts de shell
+# executem no Linux mesmo quando o repositorio e clonado em Windows,
+# onde core.autocrlf=true reescreveria as quebras de linha.
+* text=auto eol=lf
+
+# Imagens de icone nao sao texto.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+
+# Lockfile deve continuar identico ao gerado pelo npm.
+package-lock.json -diff

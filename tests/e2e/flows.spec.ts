@@ -1,0 +1,76 @@
+import { test, expect } from '@playwright/test';
+
+test('primeiro acesso, usuários, privacidade e pagamento compartilhado', async ({ page }) => {
+  await page.goto('/login');
+  await page.getByLabel('Usuário', { exact: true }).fill('admin');
+  await page.getByLabel('Senha', { exact: true }).fill('TestOnlyPassword2026');
+  await page.getByRole('button', { name: 'Entrar no meu espaço' }).click();
+  await expect(page.getByRole('heading', { name: 'Crie sua senha pessoal' })).toBeVisible();
+  await page.getByLabel('Senha atual ou temporária').fill('TestOnlyPassword2026');
+  await page.getByLabel('Nova senha', { exact: true }).fill('AdminChangedPassword2026');
+  await page.getByLabel('Confirmar nova senha').fill('AdminChangedPassword2026');
+  await page.getByRole('button', { name: 'Salvar minha senha' }).click();
+  await expect(page.getByRole('heading', { name: 'Visão geral' })).toBeVisible();
+
+  await page.getByRole('link', { name: 'Usuários', exact: true }).click();
+  await page.getByLabel('Nome', { exact: true }).fill('Ana Teste');
+  await page.getByLabel('Usuário', { exact: true }).fill('ana');
+  await page.getByLabel('Senha temporária').fill('AnaTemporaryPassword2026');
+  await page.getByRole('button', { name: 'Criar usuário', exact: true }).click();
+  await expect(page.getByRole('status')).toContainText('Usuário criado');
+
+  await page.goto('/?view=new');
+  await page.getByLabel('Descrição / origem da conta').fill('Notebook privado');
+  await page.getByLabel('Valor (R$)', { exact: true }).fill('3000,00');
+  await page.getByLabel('Quantidade total de parcelas').fill('3');
+  await page.getByLabel('Observações privadas').fill('Observação secreta do credor');
+  await page.getByRole('button', { name: 'Criar lançamento', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Notebook privado', exact: true })).toBeVisible();
+  const privateUrl = page.url();
+  await expect(page.locator('.installment')).toHaveCount(3);
+
+  await page.goto('/?view=new');
+  await page.getByRole('button', { name: 'Cobrar alguém' }).click();
+  await page.getByLabel('Descrição compartilhada').fill('Parte do notebook');
+  await page.getByLabel('Valor (R$)', { exact: true }).fill('1500,00');
+  await page.getByLabel('Quantidade total de parcelas').fill('3');
+  await page.getByLabel('Quem deve pagar?').selectOption({ label: 'Ana Teste' });
+  await page.getByLabel('Vincular a uma despesa sua').selectOption({ label: 'Notebook privado' });
+  await page.getByRole('button', { name: 'Criar cobrança' }).click();
+  await expect(page.getByRole('heading', { name: 'Parte do notebook', exact: true })).toBeVisible();
+  const sharedUrl = page.url();
+  await page.getByRole('button', { name: 'Sair', exact: true }).click();
+
+  await page.getByLabel('Usuário', { exact: true }).fill('ana');
+  await page.getByLabel('Senha', { exact: true }).fill('AnaTemporaryPassword2026');
+  await page.getByRole('button', { name: 'Entrar no meu espaço' }).click();
+  await page.getByLabel('Senha atual ou temporária').fill('AnaTemporaryPassword2026');
+  await page.getByLabel('Nova senha', { exact: true }).fill('AnaChangedPassword2026');
+  await page.getByLabel('Confirmar nova senha').fill('AnaChangedPassword2026');
+  await page.getByRole('button', { name: 'Salvar minha senha' }).click();
+  await expect(page.getByRole('heading', { name: 'Visão geral' })).toBeVisible();
+  await page.goto(privateUrl);
+  await expect(page.getByRole('heading', { name: 'Não encontramos esse lançamento.' })).toBeVisible();
+  await page.goto(sharedUrl);
+  await expect(page.getByText('Observação secreta do credor')).toHaveCount(0);
+  await expect(page.getByText('Notebook privado', { exact: true })).toHaveCount(0);
+  await page.locator('summary').filter({ hasText: 'Registrar pagamento' }).first().click();
+  await page.getByLabel('Valor pago (R$)').first().fill('200,00');
+  await page.getByRole('button', { name: 'Confirmar baixa' }).first().click();
+  await expect(page.locator('.detail-stats .featured strong')).toHaveText(/1.300,00/);
+  await page.goto('/');
+  await expect(page.getByRole('heading', { name: 'Visão geral' })).toBeVisible();
+  await page.screenshot({ path: 'test-results/dashboard-desktop.png', fullPage: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.getByRole('heading', { name: 'Visão geral' })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: 'test-results/dashboard-mobile.png', fullPage: true });
+  await page.getByRole('button', { name: 'Sair', exact: true }).click();
+  await page.getByLabel('Usuário', { exact: true }).fill('admin');
+  await page.getByLabel('Senha', { exact: true }).fill('AdminChangedPassword2026');
+  await page.getByRole('button', { name: 'Entrar no meu espaço' }).click();
+  await expect(page.getByRole('heading', { name: 'Visão geral' })).toBeVisible();
+  await page.goto(sharedUrl);
+  await expect(page.locator('.detail-stats .featured strong')).toHaveText(/1.300,00/);
+  await expect(page.getByText('informado por Ana Teste', { exact: false })).toBeVisible();
+});

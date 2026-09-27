@@ -1,0 +1,2 @@
+"use client";
+export default function ErrorPage({ reset }: { reset: () => void }) { return <main className="centered-page"><section className="panel password-panel"><h1>Não foi possível carregar seu espaço.</h1><p className="muted">Tente novamente em instantes. Se persistir, peça ao administrador para conferir a conexão com o banco.</p><button className="button" onClick={reset}>Tentar novamente</button></section></main>; }

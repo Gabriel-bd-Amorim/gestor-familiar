@@ -1,0 +1,25 @@
+name: entrecontas-tests
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: test
+      POSTGRES_PASSWORD: test-only-password
+      POSTGRES_DB: entrecontas_test
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U test -d entrecontas_test"]
+      interval: 2s
+      timeout: 5s
+      retries: 20
+    tmpfs:
+      - /var/lib/postgresql/data
+  tests:
+    build:
+      context: .
+      target: tests
+    environment:
+      DATABASE_URL: postgresql://test:test-only-password@postgres:5432/entrecontas_test
+      TZ: America/Sao_Paulo
+    depends_on:
+      postgres:
+        condition: service_healthy
