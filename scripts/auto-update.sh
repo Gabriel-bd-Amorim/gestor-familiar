@@ -10,6 +10,17 @@ LOCK_FILE="${LOCK_FILE:-/tmp/gestor-familiar-autoupdate.lock}"
 BACKUP_DIR="${BACKUP_DIR:-$APP_DIR/backups}"
 KEEP_BACKUPS="${KEEP_BACKUPS:-10}"
 
+# O .env define TZ e o host pode estar em outro fuso. Como o log e escrito com
+# date, fixar o fuso aqui e o que mantem a primeira e a ultima linha do mesmo
+# registro de acordo; caso contrario a linha posterior a leitura do .env sai
+# com um fuso e as anteriores com outro.
+if [ -z "${TZ:-}" ] && [ -f "$APP_DIR/.env" ]; then
+  TZ="$(sed -n 's/^TZ=//p' "$APP_DIR/.env" 2>/dev/null | head -1)"
+  if [ -n "$TZ" ]; then
+    export TZ
+  fi
+fi
+
 # O ZimaOS monta /root somente para leitura; sem isto o docker aborta o build
 # ao tentar criar $HOME/.docker. O cron tambem roda com um HOME minimo, entao o
 # diretorio precisa vir de fora.
