@@ -18,6 +18,10 @@ export DOCKER_CONFIG
 mkdir -p "$DOCKER_CONFIG" 2>/dev/null || DOCKER_CONFIG=/tmp/.config-gestor
 export DOCKER_CONFIG
 
+SELF_PATH="${GF_SELF_PATH:-$0}"
+# 0 = ainda nao trouxemos nada do GitHub; 1 = codigo ja movido para origin/$BRANCH.
+RESUMED="${GF_RESUMED:-0}"
+
 log() {
   printf '%s %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >>"$LOG_FILE"
 }
@@ -27,44 +31,78 @@ die() {
   exit 1
 }
 
-# Evita execucoes simultaneas quando o build anterior ainda roda.
-if ! mkdir "$LOCK_FILE" 2>/dev/null; then
-  log "Outra atualizacao em andamento; nada a fazer."
-  exit 0
+release_lock() {
+  rm -rf "$LOCK_FILE" 2>/dev/null || true
+}
+
+# O exec abaixo preserva o PID, entao o dono da trava continua sendo este mesmo
+# processo e a etapa reanudada pode continuar usando a mesma trava.
+acquire_lock() {
+  if mkdir "$LOCK_FILE" 2>/dev/null; then
+    echo $$ >"$LOCK_FILE/pid"
+    return 0
+  fi
+  # Trava de uma execucao anterior que morreu no meio do caminho.
+  owner="$(cat "$LOCK_FILE/pid" 2>/dev/null || true)"
+  if [ -n "$owner" ] && ! kill -0 "$owner" 2>/dev/null; then
+    release_lock
+    if mkdir "$LOCK_FILE" 2>/dev/null; then
+      echo $$ >"$LOCK_FILE/pid"
+      return 0
+    fi
+  fi
+  return 1
+}
+
+# ---------------------------------------------------------------- etapa 1
+# Buscar o codigo novo e realinhar o repositorio.
+if [ "$RESUMED" = "0" ]; then
+  if ! acquire_lock; then
+    log "Outra atualizacao em andamento; nada a fazer."
+    exit 0
+  fi
+
+  cd "$APP_DIR" || die "Diretorio $APP_DIR nao encontrado."
+
+  CURRENT="$(git rev-parse HEAD 2>/dev/null || true)"
+  [ -n "$CURRENT" ] || die "Nao e um repositorio git valido."
+
+  git fetch --quiet origin "$BRANCH" || die "Falha no git fetch de origin/$BRANCH."
+
+  REMOTE="$(git rev-parse "origin/$BRANCH" 2>/dev/null || true)"
+  [ -n "$REMOTE" ] || die "origin/$BRANCH nao encontrado."
+
+  if [ "$CURRENT" = "$REMOTE" ]; then
+    log "Codigo inalterado em $CURRENT. Nada a fazer."
+    release_lock
+    exit 0
+  fi
+
+  log "Nova versao detectada: $CURRENT -> $REMOTE. Atualizando."
+
+  # .env e backups sao ignorados pelo git, portanto reset --hard nao os apaga.
+  git reset --hard "$REMOTE" || die "Falha ao mover o codigo para $REMOTE."
+  git clean -fdq -e backups || die "Falha ao limpar arquivos nao rastreados."
+
+  # Este reset acabou de substituir o arquivo que estamos executando. O shell
+  # continuaria lendo o inode antigo ate o fim, ou seja, a versao nova jamais
+  # entraria em vigor. Reexecutamos para que o restante rode o codigo novo.
+  GF_RESUMED=1
+  GF_SELF_PATH="$SELF_PATH"
+  export GF_RESUMED GF_SELF_PATH
+  exec sh "$SELF_PATH"
 fi
-trap 'rmdir "$LOCK_FILE" 2>/dev/null || true' EXIT INT TERM
+
+# ---------------------------------------------------------------- etapa 2
+# Backup, reconstrucao e subida. Roda sempre a versao recem-baixada.
+trap 'release_lock' EXIT INT TERM
 
 cd "$APP_DIR" || die "Diretorio $APP_DIR nao encontrado."
+REMOTE="$(git rev-parse HEAD)"
 
-CURRENT="$(git rev-parse HEAD 2>/dev/null || true)"
-[ -n "$CURRENT" ] || die "Nao e um repositorio git valido."
-
-git fetch --quiet origin "$BRANCH" || die "Falha no git fetch de origin/$BRANCH."
-
-REMOTE="$(git rev-parse "origin/$BRANCH" 2>/dev/null || true)"
-[ -n "$REMOTE" ] || die "origin/$BRANCH nao encontrado."
-
-if [ "$CURRENT" = "$REMOTE" ]; then
-  log "Codigo inalterado em $CURRENT. Nada a fazer."
-  exit 0
-fi
-
-log "Nova versao detectada: $CURRENT -> $REMOTE. Atualizando."
-
-# .env e backups sao ignorados pelo git, portanto reset --hard nao os apaga.
-git reset --hard "$REMOTE" || die "Falha ao mover o codigo para $REMOTE."
-git clean -fdq -e backups || die "Falha ao limpar arquivos na rastreados."
-
-cd "$APP_DIR" || die "Diretorio $APP_DIR nao encontrado apos o reset."
-
-set -a
-. ./.env
-set +a
-
-# Backup do banco antes de qualquer migracao, para permitir rollback.
-# A limpeza e nada mais que higiene: nunca pode impedir a atualizacao.
+# O ZimaOS nao traz xargs, entao a contagem e feita em shell puro. Esta etapa e
+# apenas higiene e nunca pode impedir a atualizacao.
 prune_backups() {
-  # O ZimaOS nao traz xargs, entao a contagem roda em shell puro.
   kept=0
   for dump in $(ls -1t "$BACKUP_DIR"/pre-update-*.dump 2>/dev/null); do
     kept=$((kept + 1))
@@ -73,6 +111,10 @@ prune_backups() {
     fi
   done
 }
+
+set -a
+. ./.env
+set +a
 
 mkdir -p "$BACKUP_DIR"
 STAMP="$(date '+%Y%m%d-%H%M%S')"
