@@ -7,11 +7,13 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { createSession, deleteSession, hashPassword, loginAllowed, requireAdmin, requireUser, verifyPassword } from "@/lib/auth";
 import { cancelEntry, recordPayment, reversePayment } from "@/lib/finance";
+import { cancelIncome, recordIncome } from "@/lib/income";
+import { createSimulation, deleteSimulation } from "@/lib/simulation";
 import { parseDate, parseMoney, schedule } from "@/lib/money";
 
 export type ActionState = { error?: string; success?: string };
 const value = (form: FormData, name: string) => String(form.get(name) ?? "").trim();
-const passwordSchema = z.string().min(12, "Use uma senha com pelo menos 12 caracteres.").max(128, "A senha deve ter até 128 caracteres.");
+const passwordSchema = z.string().min(4, "Use uma senha com pelo menos 4 caracteres.").max(128, "A senha deve ter até 128 caracteres.");
 const usernameSchema = z.string().regex(/^[a-z0-9._-]{3,40}$/, "Use um usuário de 3 a 40 caracteres: letras minúsculas, números, ponto, hífen ou sublinhado.");
 function failure(error: unknown): ActionState {
   if (error instanceof z.ZodError) return { error: error.issues[0].message };
@@ -110,6 +112,27 @@ export async function accountAction(_: ActionState, form: FormData): Promise<Act
     return refreshed("Conta adicionada.");
   } catch (error) { return failure(error); }
 }
+export async function incomeAction(_: ActionState, form: FormData): Promise<ActionState> {
+  const user = await requireUser();
+  let month = "";
+  try {
+    const income = await recordIncome(user.id, {
+      kind: value(form, "kind") as "salary" | "other", source: value(form, "source"),
+      amount: value(form, "amount"), receivedAt: value(form, "receivedAt"),
+      notes: value(form, "notes"), requestKey: value(form, "requestKey"),
+    });
+    month = income.receivedAt.toISOString().slice(0, 7);
+    revalidatePath("/", "layout");
+  } catch (error) { return failure(error); }
+  redirect(`/?view=income&month=${month}`);
+}
+export async function cancelIncomeAction(_: ActionState, form: FormData): Promise<ActionState> {
+  const user = await requireUser();
+  try {
+    await cancelIncome(user.id, value(form, "incomeId"));
+    return refreshed("Renda cancelada. O resumo foi recalculado; o histórico foi preservado.");
+  } catch (error) { return failure(error); }
+}
 export async function entryAction(_: ActionState, form: FormData): Promise<ActionState> {
   const user = await requireUser();
   let id = "";
@@ -161,5 +184,47 @@ export async function cancelAction(_: ActionState, form: FormData): Promise<Acti
   try {
     await cancelEntry(user.id, value(form, "entryId"));
     return refreshed("Lançamento cancelado.");
+  } catch (error) { return failure(error); }
+}
+
+export async function profileAction(_: ActionState, form: FormData): Promise<ActionState> {
+  const user = await requireUser();
+  try {
+    const name = z.string().min(2).max(70).parse(value(form, "name"));
+    const username = value(form, "username");
+    if (username) {
+      const usernameSchema = z.string().regex(/^[a-z0-9._-]{3,40}$/, "Use um usuário de 3 a 40 caracteres: letras minúsculas, números, ponto, hífen ou sublinhado.");
+      usernameSchema.parse(username.toLowerCase());
+      const exists = await db.user.findFirst({ where: { username: username.toLowerCase(), id: { not: user.id } } });
+      if (exists) throw new Error("Este usuário já está em uso.");
+    }
+    await db.user.update({ where: { id: user.id }, data: { name, username: username.toLowerCase() || user.username } });
+    return refreshed("Perfil atualizado.");
+  } catch (error) { return failure(error); }
+}
+
+export async function simulationAction(_: ActionState, form: FormData): Promise<ActionState> {
+  const user = await requireUser();
+  try {
+    await createSimulation(user.id, {
+      description: value(form, "description"),
+      category: value(form, "category"),
+      notes: value(form, "notes") || "",
+      firstDue: value(form, "firstDue"),
+      count: Number(value(form, "count")),
+      startNumber: Number(value(form, "startNumber")),
+      amount: value(form, "amount"),
+      amountMode: value(form, "amountMode") as "total" | "installment",
+    });
+    return refreshed("Simulação salva.");
+  } catch (error) { return failure(error); }
+  redirect("/?view=simulations");
+}
+
+export async function deleteSimulationAction(_: ActionState, form: FormData): Promise<ActionState> {
+  const user = await requireUser();
+  try {
+    await deleteSimulation(user.id, value(form, "simulationId"));
+    return refreshed("Simulação excluída.");
   } catch (error) { return failure(error); }
 }

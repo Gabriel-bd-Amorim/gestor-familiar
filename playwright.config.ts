@@ -4,5 +4,5 @@ export default defineConfig({
   timeout: 90000,
   workers: 1,
   reporter: 'list',
-  use: { baseURL: 'http://localhost:3101', browserName: 'firefox', viewport: { width: 1440, height: 1000 }, trace: 'retain-on-failure', screenshot: 'only-on-failure' },
+  use: { baseURL: process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:3101', browserName: 'firefox', viewport: { width: 1440, height: 1000 }, trace: 'retain-on-failure', screenshot: 'only-on-failure' },
 });

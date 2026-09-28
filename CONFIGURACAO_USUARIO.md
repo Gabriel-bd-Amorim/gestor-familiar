@@ -158,6 +158,9 @@ Não será necessário configurar e-mail, convites ou cadastro público para o f
 
 ## 5. Conferir o uso inicial
 
+- [ ] Em **Salário e rendas**, registrar o salário líquido recebido, indicando a empresa como origem.
+- [ ] Registrar outra renda, como freelance ou venda, com sua origem, valor e data.
+- [ ] Conferir **Quanto sobra no mês?**: rendas + recebido das cobranças − compromissos integrais do mês (pagos e pendentes). A projeção inclui também cobranças a receber; o valor não é um saldo bancário.
 - [ ] Criar uma compra privada parcelada e conferir valor, vencimento e `parcela atual / total`.
 - [ ] Criar uma cobrança para outro usuário.
 - [ ] Entrar na conta destinatária e conferir que somente a cobrança compartilhada aparece.
@@ -166,6 +169,10 @@ Não será necessário configurar e-mail, convites ou cadastro público para o f
 - [ ] Se a IA estiver ativa, solicitar um resumo da própria situação financeira.
 
 A baixa informa que um pagamento foi realizado; ela não transfere dinheiro entre usuários. A transferência em si será feita fora da aplicação.
+
+Rendas entram no mês do recebimento; cobranças e despesas entram pelo vencimento da parcela, incluindo as já pagas. Baixas e estornos ajustam o planejamento desse mesmo mês. Não cadastre a baixa de uma cobrança também como renda, para não duplicar a entrada. Registre o salário a cada recebimento: não há recorrência automática. Para corrigir renda, use **Corrigir recebimento** e cancele antes de recadastrar. Os registros são privados e cancelamentos ficam no histórico.
+
+A migração `202609280001_income` adiciona a tabela de rendas preservando despesas, usuários e pagamentos existentes. Ela é aplicada pelo serviço `migrate` na atualização.
 
 ## 6. Backups e atualizações
 

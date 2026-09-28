@@ -1,6 +1,7 @@
 import { currentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { listEntries, summary } from "@/lib/finance";
+import { listIncomes } from "@/lib/income";
 import { today, money } from "@/lib/money";
 
 export const dynamic = "force-dynamic";
@@ -25,12 +26,15 @@ export async function POST(request: Request) {
   });
   if (!record) return Response.json({ error: "Limite de 15 consultas por hora atingido. Tente mais tarde." }, { status: 429 });
   try {
-    const entries = await listEntries(user.id);
     const month = today().slice(0, 7);
-    const report = summary(entries, user.id, month);
+    const [entries, incomes] = await Promise.all([listEntries(user.id), listIncomes(user.id, month)]);
+    const report = summary(entries, user.id, month, incomes);
     const rows = report.rows.filter(r => r.remaining > 0).sort((a, b) => a.date.localeCompare(b.date));
     const context = {
       data: today(), mes: month, moeda: "BRL", aPagarNoMes: money(report.due), aReceberNoMes: money(report.receiving), vencido: money(report.overdue),
+      salarioRecebido: money(report.salary), outrasRendas: money(report.otherIncome), recebidoDasCobrancasDoMes: money(report.received),
+      compromissosDoMes: money(report.total), saldoDoPlanejamento: money(report.budgetBalance), saldoProjetadoComCobrancasPendentes: money(report.projectedBalance),
+      criterioDoPlanejamento: "Rendas pela data de recebimento; despesas e cobranças pelo mês de vencimento, incluindo parcelas pagas. Não é saldo bancário. Não transporta saldos anteriores. Rendas registradas são recebimentos manuais, não uma previsão recorrente.",
       limiteDeItens: 150, itensOmitidos: Math.max(0, rows.length - 150),
       parcelasPendentes: rows.slice(0, 150).map(r => ({ descricao: r.entry.description, categoria: r.entry.category, direcao: r.incoming ? "a receber" : "a pagar", parcela: `${r.installment.number}/${r.entry.count}`, vencimento: r.date, saldo: money(r.remaining) })),
     };

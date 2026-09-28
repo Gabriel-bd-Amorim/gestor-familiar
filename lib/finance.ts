@@ -1,4 +1,4 @@
-import { Prisma } from "@prisma/client";
+import { Prisma, type Income } from "@prisma/client";
 import { db } from "./db";
 import { balance, money, parseDate, today } from "./money";
 
@@ -17,19 +17,31 @@ export function listEntries(userId: string) {
 export function getEntry(userId: string, id: string) {
   return db.entry.findFirst({ where: { id, ...visibleEntries(userId) }, include: entryInclude });
 }
-export function summary(entries: FullEntry[], userId: string, month: string) {
+export function summary(entries: FullEntry[], userId: string, month: string, incomes: Income[] = []) {
   const monthStart = `${month}-01`;
   const now = today();
   const rows = entries.filter(e => !e.cancelledAt).flatMap(entry => entry.installments.map(installment => ({ entry, installment, remaining: balance(installment), date: installment.dueDate.toISOString().slice(0, 10), incoming: entry.debtorId !== null && entry.ownerId === userId })));
   const outgoing = rows.filter(r => !r.incoming);
   const inMonth = outgoing.filter(r => r.date.startsWith(month));
+  const monthIncomes = incomes.filter(i => i.ownerId === userId && !i.cancelledAt && i.receivedAt.toISOString().startsWith(month));
+  const salary = monthIncomes.filter(i => i.kind === "salary").reduce((sum, i) => sum + i.cents, 0);
+  const otherIncome = monthIncomes.filter(i => i.kind === "other").reduce((sum, i) => sum + i.cents, 0);
+  const total = inMonth.reduce((sum, r) => sum + r.installment.cents, 0);
+  const incomingMonth = rows.filter(r => r.incoming && r.date.startsWith(month));
+  const receiving = incomingMonth.reduce((sum, r) => sum + r.remaining, 0);
+  const received = incomingMonth.reduce((sum, r) => sum + r.installment.cents - r.remaining, 0);
+  // Planejamento por vencimento: quitar uma despesa não libera renda de novo.
+  // Uma cobrança recebida é crédito para o credor, nunca despesa dele.
+  const budgetBalance = salary + otherIncome + received - total;
   return {
+    salary, otherIncome, income: salary + otherIncome, received, budgetBalance,
+    projectedBalance: budgetBalance + receiving,
     due: inMonth.reduce((sum, r) => sum + r.remaining, 0),
     paid: inMonth.reduce((sum, r) => sum + r.installment.cents - r.remaining, 0),
-    receiving: rows.filter(r => r.incoming && r.date.startsWith(month)).reduce((sum, r) => sum + r.remaining, 0),
+    receiving,
     overdue: outgoing.filter(r => r.date < now && r.remaining > 0).reduce((sum, r) => sum + r.remaining, 0),
     previous: outgoing.filter(r => r.date < monthStart && r.remaining > 0).reduce((sum, r) => sum + r.remaining, 0),
-    total: inMonth.reduce((sum, r) => sum + r.installment.cents, 0),
+    total,
     rows,
   };
 }

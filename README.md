@@ -23,6 +23,7 @@ Também é possível configurar o `.env` manualmente a partir de `.env.example`,
 - Parcelas com valores exatos, compra em andamento, vencimentos e histórico.
 - Cobranças entre dois usuários, com baixa imediata, pagamento parcial, estorno e auditoria.
 - Painel por mês, valores vencidos, categorias, recebíveis e projeção de seis meses.
+- Salário e outras rendas privadas, com origem, valor líquido, data de recebimento e planejamento mensal.
 - Assistente opcional da OpenAI, com consentimento por consulta, histórico privado e limite de uso.
 - Manifest e ícones para instalação como aplicativo em navegadores compatíveis; requer conexão, sem cache offline de dados financeiros.
 - PostgreSQL persistente, migrações, health checks e scripts de backup/restauração.
@@ -39,12 +40,22 @@ Também é possível configurar o `.env` manualmente a partir de `.env.example`,
 
 **Baixas são registros manuais, não transferências bancárias.** A cobrança não paga automaticamente a despesa original: o pagamento recebido e a quitação do cartão são acontecimentos diferentes. Não cadastre o mesmo gasto simultaneamente como compra e como fatura integral se não quiser duplicar seus compromissos.
 
+### Salário, outras rendas e quanto sobra
+
+Em **Salário e rendas**, registre cada recebimento: tipo (salário ou outra renda), origem (empresa, freelance, venda, benefício etc.), valor líquido, data e observações opcionais. É possível registrar vários recebimentos, como adiantamento e restante do salário. Use o seletor de mês para consultar o histórico. Para corrigir um erro, abra **Corrigir recebimento**, cancele o registro e cadastre o correto; o histórico é preservado.
+
+O painel calcula **saldo do planejamento = salário + outras rendas + recebido das cobranças do mês − todos os compromissos do mês**. Saldo negativo indica quanto falta. A projeção acrescenta as cobranças ainda pendentes de recebimento. Por exemplo: R$ 3.000 de salário + R$ 500 de freelance − R$ 2.000 de compromissos = R$ 1.500 de sobra.
+
+As rendas são agrupadas pela data de recebimento; despesas e cobranças, pelo mês de vencimento da parcela. Uma baixa ou estorno recalcula o planejamento desse mês, mesmo se registrado em outro mês. Pagar uma despesa não aumenta a sobra: ela já faz parte dos compromissos. Não recadastre cobranças recebidas como renda, pois suas baixas já entram no cálculo.
+
+É um planejamento mensal, não saldo bancário: não transporta saldo inicial, sobras ou dívidas anteriores (pendências anteriores são avisadas separadamente). Salário não é repetido automaticamente; registre cada recebimento real. Cada usuário vê apenas suas rendas, inclusive em relação aos administradores. O resumo da IA, quando autorizado, também considera os totais das rendas e do planejamento.
+
 ## Limites desta versão
 
 - Cadastro manual; Open Finance é uma etapa futura.
 - Faturas são acompanhadas como lançamentos; não há importação de extrato, cálculo automático de fechamento de cartão ou leitura de PDF.
 - Uma despesa pode originar uma cobrança vinculada. Para dividir entre várias pessoas, crie cobranças independentes.
-- Categorias predefinidas; sem orçamento por categoria ou controle de renda/saldo bancário.
+- Categorias predefinidas; sem orçamento por categoria ou conciliação de saldo bancário. Rendas são registradas manualmente, sem recorrência automática.
 - Sem comprovantes anexados, e-mail ou notificações push.
 - A IA é somente consultiva. A conexão real com a OpenAI depende da sua chave, modelo e créditos.
 

@@ -19,6 +19,13 @@ test('primeiro acesso, usuários, privacidade e pagamento compartilhado', async 
   await page.getByRole('button', { name: 'Criar usuário', exact: true }).click();
   await expect(page.getByRole('status')).toContainText('Usuário criado');
 
+  await page.getByRole('link', { name: 'Salário e rendas', exact: true }).click();
+  await page.getByLabel('Origem da renda', { exact: true }).fill('Empresa privada do administrador');
+  await page.getByLabel('Valor recebido (R$)', { exact: true }).fill('3000,00');
+  await page.getByRole('button', { name: 'Registrar renda', exact: true }).click();
+  await expect(page.locator('.income-list')).toContainText('Empresa privada do administrador');
+  await expect(page.locator('.income-summary .stat-card').filter({ hasText: 'Salário recebido' })).toContainText('3.000,00');
+
   await page.goto('/?view=new');
   await page.getByLabel('Descrição / origem da conta').fill('Notebook privado');
   await page.getByLabel('Valor (R$)', { exact: true }).fill('3000,00');
@@ -60,6 +67,27 @@ test('primeiro acesso, usuários, privacidade e pagamento compartilhado', async 
   await expect(page.locator('.detail-stats .featured strong')).toHaveText(/1.300,00/);
   await page.goto('/');
   await expect(page.getByRole('heading', { name: 'Visão geral' })).toBeVisible();
+  await page.getByRole('link', { name: 'Salário e rendas', exact: true }).click();
+  await expect(page.getByText('Empresa privada do administrador', { exact: true })).toHaveCount(0);
+  await page.getByLabel('Origem da renda', { exact: true }).fill('Salário Ana');
+  await page.getByLabel('Valor recebido (R$)', { exact: true }).fill('2000,00');
+  await page.getByRole('button', { name: 'Registrar renda', exact: true }).click();
+  await expect(page.locator('.income-list')).toContainText('Salário Ana');
+  await page.getByRole('combobox', { name: 'Tipo de renda', exact: true }).selectOption('other');
+  await page.getByLabel('Origem da renda', { exact: true }).fill('Freelance Ana');
+  await page.getByLabel('Valor recebido (R$)', { exact: true }).fill('150,50');
+  await page.getByRole('button', { name: 'Registrar renda', exact: true }).click();
+  await expect(page.locator('.income-list')).toContainText('Freelance Ana');
+  await expect(page.locator('.income-summary .stat-card').filter({ hasText: 'Saldo do planejamento' })).toContainText('1.650,50');
+  await page.locator('.income-item').filter({ hasText: 'Freelance Ana' }).getByText('Corrigir recebimento', { exact: true }).click();
+  await page.getByRole('button', { name: 'Cancelar renda de Freelance Ana', exact: true }).click();
+  await expect(page.locator('.income-list')).toContainText('Cancelada · fora do cálculo');
+  await expect(page.locator('.income-summary .stat-card').filter({ hasText: 'Saldo do planejamento' })).toContainText('1.500,00');
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: 'test-results/income-mobile.png', fullPage: true });
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto('/');
   await page.screenshot({ path: 'test-results/dashboard-desktop.png', fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(page.getByRole('heading', { name: 'Visão geral' })).toBeVisible();

@@ -8,22 +8,39 @@ datasource db {
 }
 
 model User {
-  id                 String    @id @default(cuid())
-  username           String    @unique
+  id                 String        @id @default(cuid())
+  username           String        @unique
   name               String
   passwordHash       String
-  admin              Boolean   @default(false)
-  active             Boolean   @default(true)
-  mustChangePassword Boolean   @default(true)
-  createdAt          DateTime  @default(now())
+  admin              Boolean       @default(false)
+  active             Boolean       @default(true)
+  mustChangePassword Boolean       @default(true)
+  createdAt          DateTime      @default(now())
   sessions           Session[]
   accounts           Account[]
-  ownedEntries       Entry[]   @relation("owner")
-  debts              Entry[]   @relation("debtor")
-  payments           Payment[] @relation("payer")
-  reversals          Payment[] @relation("reverser")
+  ownedEntries       Entry[]       @relation("owner")
+  debts              Entry[]       @relation("debtor")
+  payments           Payment[]     @relation("payer")
+  reversals          Payment[]     @relation("reverser")
   audits             Audit[]
   messages           AiMessage[]
+  incomes            Income[]
+  simulations        Simulation[]
+}
+
+model Income {
+  id          String @id @default(cuid())
+  ownerId     String
+  owner       User @relation(fields: [ownerId], references: [id])
+  kind        String
+  source      String
+  cents       Int
+  receivedAt  DateTime @db.Date
+  notes       String @default("")
+  requestKey  String @unique
+  cancelledAt DateTime?
+  createdAt   DateTime @default(now())
+  @@index([ownerId, receivedAt])
 }
 
 model Session {
@@ -126,4 +143,19 @@ model AiMessage {
   answer    String?
   createdAt DateTime @default(now())
   @@index([userId, createdAt])
+}
+
+model Simulation {
+  id          String @id @default(cuid())
+  ownerId     String
+  owner       User @relation(fields: [ownerId], references: [id])
+  description String
+  category    String
+  totalCents  Int
+  count       Int
+  startNumber Int
+  firstDue    DateTime @db.Date
+  notes       String @default("")
+  createdAt   DateTime @default(now())
+  @@index([ownerId, createdAt])
 }
