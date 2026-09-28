@@ -4,9 +4,40 @@ import { randomUUID } from 'node:crypto';
 import { db } from '../lib/db';
 import { getEntry, listEntries, recordPayment, reversePayment, cancelEntry, summary } from '../lib/finance';
 import { schedule, parseDate, balance, today } from '../lib/money';
+import { saveSalary, listSalaries, deleteSalary, saveSimulation, listSimulations, deleteSimulation } from '../lib/planning-store';
 
 if (!process.env.DATABASE_URL?.includes('/entrecontas_test')) throw new Error('Os testes de integração exigem o banco isolado entrecontas_test.');
 after(async () => { await db.$disconnect(); });
+
+test('salários e simulações persistidos são privados, inclusive para outro administrador', async () => {
+  const suffix = randomUUID();
+  const owner = await db.user.create({ data: { username: `planner-${suffix}`, name: 'Planejador', passwordHash: 'test' } });
+  const outsider = await db.user.create({ data: { username: `admin-${suffix}`, name: 'Administrador', passwordHash: 'test', admin: true } });
+  const salary = await saveSalary(owner.id, '2026-09', '3000,00');
+  await saveSalary(owner.id, '2026-09', '3500,00');
+  assert.equal((await listSalaries(owner.id)).length, 1);
+  assert.equal((await listSalaries(owner.id))[0].cents, 350000);
+  assert.deepEqual(await listSalaries(outsider.id), []);
+  await assert.rejects(deleteSalary(outsider.id, salary.id), /não encontrado/);
+  await assert.rejects(saveSalary(owner.id, '2026-13', '500'), /data/);
+  await assert.rejects(saveSalary(owner.id, '2026-10', '-10'), /válido/);
+  const zero = await saveSalary(owner.id, '2026-10', '0,00');
+  assert.equal(zero.cents, 0);
+
+  const input = { id: '', name: 'Compra privada', amount: '1000,01', count: 3, firstDue: '2026-10-31' };
+  const saved = await saveSimulation(owner.id, input);
+  assert.equal((await listSimulations(owner.id))[0].totalCents, 100001);
+  assert.deepEqual(await listSimulations(outsider.id), []);
+  await assert.rejects(saveSimulation(outsider.id, { ...input, id: saved.id, amount: '1' }), /não encontrada/);
+  await assert.rejects(deleteSimulation(outsider.id, saved.id), /não encontrada/);
+  await saveSimulation(owner.id, { ...input, id: saved.id, amount: '2000,00' });
+  assert.equal((await listSimulations(owner.id))[0].totalCents, 200000);
+  assert.equal(await db.entry.count({ where: { ownerId: owner.id } }), 0, 'simular não cria despesa');
+  await deleteSimulation(owner.id, saved.id);
+  assert.deepEqual(await listSimulations(owner.id), []);
+  await deleteSalary(owner.id, salary.id);
+  assert.equal((await listSalaries(owner.id)).length, 1);
+});
 
 test('isolamento, parcelas, pagamentos concorrentes e auditoria', async () => {
   const suffix = randomUUID();

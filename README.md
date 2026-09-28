@@ -23,6 +23,8 @@ Também é possível configurar o `.env` manualmente a partir de `.env.example`,
 - Parcelas com valores exatos, compra em andamento, vencimentos e histórico.
 - Cobranças entre dois usuários, com baixa imediata, pagamento parcial, estorno e auditoria.
 - Painel por mês, valores vencidos, categorias, recebíveis e projeção de seis meses.
+- Salário líquido recorrente com histórico de reajustes e projeção mensal após faturas/despesas.
+- Simulador de compra parcelada com prévia, cenários privados salvos, edição e exclusão.
 - Assistente opcional da OpenAI, com consentimento por consulta, histórico privado e limite de uso.
 - Manifest e ícones para instalação como aplicativo em navegadores compatíveis; requer conexão, sem cache offline de dados financeiros.
 - PostgreSQL persistente, migrações, health checks e scripts de backup/restauração.
@@ -39,12 +41,22 @@ Também é possível configurar o `.env` manualmente a partir de `.env.example`,
 
 **Baixas são registros manuais, não transferências bancárias.** A cobrança não paga automaticamente a despesa original: o pagamento recebido e a quitação do cartão são acontecimentos diferentes. Não cadastre o mesmo gasto simultaneamente como compra e como fatura integral se não quiser duplicar seus compromissos.
 
+### Salário e simulador de compra
+
+Na aba **Salário**, informe a renda líquida mensal e o mês inicial. O valor se repete até o próximo reajuste cadastrado. Salvar no mesmo mês corrige o valor; cadastrar zero interrompe a renda a partir daquele mês. Excluir um reajuste faz o valor anterior voltar a valer.
+
+Na aba **Simulador de compra**, informe um nome, o total final da compra (incluindo eventuais juros), as parcelas e o primeiro vencimento. A prévia compara a sobra mensal antes/depois da compra e destaca valores negativos. Mostra ao menos 12 meses a partir do primeiro vencimento, ou todas as parcelas para compras mais longas, até dezembro de 2100. Salve para reabrir, editar ou excluir depois. Os cenários são independentes, privados e recalculados com salários e despesas atuais; não criam lançamentos reais.
+
+A sobra é **salário menos o total dos compromissos do mês**, incluindo parcelas pagas e cobranças recebidas. A coluna “Ainda a pagar” distingue o saldo pendente. Não é saldo bancário acumulado, não inclui recebíveis como renda e não transfere atrasos de meses anteriores.
+
+Senhas de **6 caracteres**, inclusive somente números, são aceitas na criação, redefinição e troca. Senhas maiores continuam válidas.
+
 ## Limites desta versão
 
 - Cadastro manual; Open Finance é uma etapa futura.
 - Faturas são acompanhadas como lançamentos; não há importação de extrato, cálculo automático de fechamento de cartão ou leitura de PDF.
 - Uma despesa pode originar uma cobrança vinculada. Para dividir entre várias pessoas, crie cobranças independentes.
-- Categorias predefinidas; sem orçamento por categoria ou controle de renda/saldo bancário.
+- Categorias predefinidas; sem orçamento por categoria, conciliação de recebimentos de salário ou saldo bancário.
 - Sem comprovantes anexados, e-mail ou notificações push.
 - A IA é somente consultiva. A conexão real com a OpenAI depende da sua chave, modelo e créditos.
 

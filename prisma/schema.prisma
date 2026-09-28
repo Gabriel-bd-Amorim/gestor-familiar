@@ -24,6 +24,63 @@ model User {
   reversals          Payment[] @relation("reverser")
   audits             Audit[]
   messages           AiMessage[]
+  salaries           Salary[]
+  simulations        PurchaseSimulation[]
+  legacyIncomes      Income[]
+  legacySimulations  Simulation[]
+}
+
+// Preserve data and migration history from the previously published version.
+model Income {
+  id          String @id @default(cuid())
+  ownerId     String
+  owner       User @relation(fields: [ownerId], references: [id])
+  kind        String
+  source      String
+  cents       Int
+  receivedAt  DateTime @db.Date
+  notes       String @default("")
+  requestKey  String @unique
+  cancelledAt DateTime?
+  createdAt   DateTime @default(now())
+  @@index([ownerId, receivedAt])
+}
+
+model Simulation {
+  id          String @id @default(cuid())
+  ownerId     String
+  owner       User @relation(fields: [ownerId], references: [id])
+  description String
+  category    String
+  totalCents  Int
+  count       Int
+  startNumber Int
+  firstDue    DateTime @db.Date
+  notes       String @default("")
+  createdAt   DateTime @default(now())
+  @@index([ownerId, createdAt])
+}
+
+model Salary {
+  id         String @id @default(cuid())
+  userId     String
+  user       User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  startMonth String
+  cents      Int
+  @@unique([userId, startMonth])
+}
+
+model PurchaseSimulation {
+  id         String @id @default(cuid())
+  userId     String
+  user       User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name       String
+  totalCents Int
+  count      Int
+  firstDue   DateTime @db.Date
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  @@index([userId, updatedAt])
 }
 
 model Session {

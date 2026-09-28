@@ -8,10 +8,11 @@ import { db } from "@/lib/db";
 import { createSession, deleteSession, hashPassword, loginAllowed, requireAdmin, requireUser, verifyPassword } from "@/lib/auth";
 import { cancelEntry, recordPayment, reversePayment } from "@/lib/finance";
 import { parseDate, parseMoney, schedule } from "@/lib/money";
+import { deleteSalary, deleteSimulation, saveSalary, saveSimulation } from "@/lib/planning-store";
 
 export type ActionState = { error?: string; success?: string };
 const value = (form: FormData, name: string) => String(form.get(name) ?? "").trim();
-const passwordSchema = z.string().min(12, "Use uma senha com pelo menos 12 caracteres.").max(128, "A senha deve ter até 128 caracteres.");
+const passwordSchema = z.string().min(6, "Use uma senha com pelo menos 6 caracteres. Pode ser somente números.").max(128, "A senha deve ter até 128 caracteres.");
 const usernameSchema = z.string().regex(/^[a-z0-9._-]{3,40}$/, "Use um usuário de 3 a 40 caracteres: letras minúsculas, números, ponto, hífen ou sublinhado.");
 function failure(error: unknown): ActionState {
   if (error instanceof z.ZodError) return { error: error.issues[0].message };
@@ -162,4 +163,37 @@ export async function cancelAction(_: ActionState, form: FormData): Promise<Acti
     await cancelEntry(user.id, value(form, "entryId"));
     return refreshed("Lançamento cancelado.");
   } catch (error) { return failure(error); }
+}
+
+export async function salaryAction(_: ActionState, form: FormData): Promise<ActionState> {
+  const user = await requireUser();
+  try {
+    await saveSalary(user.id, value(form, "startMonth"), value(form, "amount"));
+    return refreshed("Salário salvo. As projeções foram atualizadas.");
+  } catch (error) { return failure(error); }
+}
+export async function deleteSalaryAction(_: ActionState, form: FormData): Promise<ActionState> {
+  const user = await requireUser();
+  try {
+    await deleteSalary(user.id, value(form, "id"));
+    return refreshed("Salário removido. O valor anterior volta a valer, se houver.");
+  } catch (error) { return failure(error); }
+}
+export async function simulationAction(_: ActionState, form: FormData): Promise<ActionState> {
+  const user = await requireUser();
+  let id: string;
+  try {
+    const saved = await saveSimulation(user.id, { id: value(form, "id"), name: value(form, "name"), amount: value(form, "amount"), count: Number(value(form, "count")), firstDue: value(form, "firstDue") });
+    id = saved.id;
+    revalidatePath("/", "layout");
+  } catch (error) { return failure(error); }
+  redirect(`/?view=simulator&simulation=${encodeURIComponent(id)}`);
+}
+export async function deleteSimulationAction(_: ActionState, form: FormData): Promise<ActionState> {
+  const user = await requireUser();
+  try {
+    await deleteSimulation(user.id, value(form, "id"));
+    revalidatePath("/", "layout");
+  } catch (error) { return failure(error); }
+  redirect("/?view=simulator");
 }

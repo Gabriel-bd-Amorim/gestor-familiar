@@ -10,6 +10,9 @@ import { Shell } from "@/components/shell";
 import { EntryForm } from "@/components/entry-form";
 import { Assistant } from "@/components/assistant";
 import { Refresh } from "@/components/refresh";
+import { Salary } from "@/components/salary";
+import { PurchaseSimulator } from "@/components/purchase-simulator";
+import { listSalaries, listSimulations } from "@/lib/planning-store";
 
 export const dynamic = "force-dynamic";
 const titles: Record<string, [string, string]> = {
@@ -18,6 +21,8 @@ const titles: Record<string, [string, string]> = {
   receiving: ["A receber", "O que você compartilhou, com tudo bem explicado."],
   debts: ["Contas recebidas", "Cobranças direcionadas a você. Acerte no seu ritmo."],
   accounts: ["Contas e cartões", "Organize de onde vêm suas despesas."],
+  salary: ["Salário", "Saiba quanto sobra depois das faturas e despesas."],
+  simulator: ["Simulador de compra", "Veja o impacto de uma compra antes de decidir."],
   assistant: ["Seu assistente financeiro", "Transforme seus números em próximos passos."],
   users: ["Pessoas da casa", "Acessos individuais. Finanças independentes."],
   new: ["Novo lançamento", "Dê um lugar para cada conta."],
@@ -44,6 +49,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
   const entries = await listEntries(user.id);
   const report = summary(entries, user.id, month);
   const [title, subtitle] = titles[view];
+  const commitments = report.rows.filter(r => !r.incoming).map(r => ({ date: r.date, cents: r.installment.cents, remaining: r.remaining }));
   const privateEntries = entries.filter(e => !e.debtorId);
   const incoming = entries.filter(e => e.debtorId && e.ownerId === user.id);
   const debts = entries.filter(e => e.debtorId === user.id);
@@ -86,7 +92,14 @@ export default async function Home({ searchParams }: { searchParams: Promise<Rec
       const accounts = await db.account.findMany({ where: { ownerId: user.id }, orderBy: { name: "asc" }, include: { _count: { select: { entries: true } } } });
       return accounts.length ? accounts.map(a => <div className="account-row" key={a.id}><span className="entry-icon"><WalletCards size={22} /></span><div><strong>{a.name}</strong><small>{a.kind} · {a._count.entries} lançamento(s)</small></div><span className="badge">Manual</span></div>) : <Empty text="Tudo começa com uma conta" detail="Adicione um cartão, conta ou carteira para organizar seus lançamentos." />;
     })()}</section><section className="panel"><h2>Adicionar conta ou cartão</h2><p className="muted">Apenas um nome para organização. Não informe senhas ou números completos de cartões.</p><ActionForm action={accountAction} className="stack"><label>Nome<input name="name" placeholder="Ex.: Cartão principal" required minLength={2} maxLength={60} /></label><label>Tipo<select name="kind"><option>Conta</option><option>Cartão</option><option>Carteira</option></select></label><Submit>Adicionar conta</Submit></ActionForm><p className="helper">Conexão bancária não disponível nesta versão. O cadastro manual funciona sem tokens.</p></section></div>}
+    {view === "salary" && <Salary key={month} salaries={await listSalaries(user.id)} commitments={commitments} month={month} />}
+    {view === "simulator" && await (async () => {
+      const [salaries, simulations] = await Promise.all([listSalaries(user.id), listSimulations(user.id)]);
+      const saved = simulations.map(s => ({ id: s.id, name: s.name, totalCents: s.totalCents, count: s.count, firstDue: s.firstDue.toISOString().slice(0, 10) }));
+      const selected = saved.find(s => s.id === params.simulation);
+      return <>{params.simulation && !selected && <p className="notice error">Simulação não encontrada.</p>}<PurchaseSimulator key={selected?.id ?? "new"} salaries={salaries.map(s => ({ startMonth: s.startMonth, cents: s.cents }))} commitments={commitments} saved={saved} selected={selected} date={today()} /></>;
+    })()}
     {view === "assistant" && <Assistant enabled={!!process.env.OPENAI_API_KEY} history={await db.aiMessage.findMany({ where: { userId: user.id, answer: { not: null } }, orderBy: { createdAt: "desc" }, take: 20, select: { id: true, question: true, answer: true } })} />}
-    {view === "users" && user.admin && <div className="dashboard-grid"><section className="panel"><div className="panel-heading"><div><h2>Usuários do servidor</h2><p>Administrar acessos não dá acesso às finanças.</p></div></div>{(await db.user.findMany({ select: { id: true, name: true, username: true, active: true, admin: true }, orderBy: { createdAt: "asc" } })).map(person => <div className="user-item" key={person.id}><div className="account-row"><span className="avatar">{person.name[0]}</span><div><strong>{person.name}</strong><small>@{person.username} · {person.admin ? "Administrador" : person.active ? "Ativo" : "Desativado"}</small></div></div>{!person.admin && <details><summary>Gerenciar acesso</summary><ActionForm action={manageUserAction} className="stack compact"><input type="hidden" name="userId" value={person.id} /><input type="hidden" name="operation" value="reset" /><label>Nova senha temporária<input name="password" type="password" minLength={12} maxLength={128} autoComplete="new-password" required /></label><Submit className="button secondary small">Redefinir senha</Submit></ActionForm><ActionForm action={manageUserAction} className="compact"><input type="hidden" name="userId" value={person.id} /><input type="hidden" name="operation" value="toggle" /><Submit className="button secondary small">{person.active ? "Desativar acesso" : "Reativar acesso"}</Submit></ActionForm></details>}</div>)}</section><section className="panel"><h2>Criar novo usuário</h2><p className="muted">Cada pessoa recebe um espaço privado.</p><ActionForm action={createUserAction} className="stack"><label>Nome<input name="name" required minLength={2} maxLength={70} placeholder="Como a pessoa se chama?" /></label><label>Usuário<input name="username" autoCapitalize="none" autoComplete="off" pattern="[a-z0-9._\-]{3,40}" required placeholder="ex.: ana.silva" /></label><label>Senha temporária<input name="password" type="password" required minLength={12} maxLength={128} autoComplete="new-password" /><small>Pelo menos 12 caracteres; troca obrigatória no primeiro acesso.</small></label><Submit>Criar usuário</Submit></ActionForm></section></div>}
+    {view === "users" && user.admin && <div className="dashboard-grid"><section className="panel"><div className="panel-heading"><div><h2>Usuários do servidor</h2><p>Administrar acessos não dá acesso às finanças.</p></div></div>{(await db.user.findMany({ select: { id: true, name: true, username: true, active: true, admin: true }, orderBy: { createdAt: "asc" } })).map(person => <div className="user-item" key={person.id}><div className="account-row"><span className="avatar">{person.name[0]}</span><div><strong>{person.name}</strong><small>@{person.username} · {person.admin ? "Administrador" : person.active ? "Ativo" : "Desativado"}</small></div></div>{!person.admin && <details><summary>Gerenciar acesso</summary><ActionForm action={manageUserAction} className="stack compact"><input type="hidden" name="userId" value={person.id} /><input type="hidden" name="operation" value="reset" /><label>Nova senha temporária<input name="password" type="password" minLength={6} maxLength={128} autoComplete="new-password" required /></label><Submit className="button secondary small">Redefinir senha</Submit></ActionForm><ActionForm action={manageUserAction} className="compact"><input type="hidden" name="userId" value={person.id} /><input type="hidden" name="operation" value="toggle" /><Submit className="button secondary small">{person.active ? "Desativar acesso" : "Reativar acesso"}</Submit></ActionForm></details>}</div>)}</section><section className="panel"><h2>Criar novo usuário</h2><p className="muted">Cada pessoa recebe um espaço privado.</p><ActionForm action={createUserAction} className="stack"><label>Nome<input name="name" required minLength={2} maxLength={70} placeholder="Como a pessoa se chama?" /></label><label>Usuário<input name="username" autoCapitalize="none" autoComplete="off" pattern="[a-z0-9._\-]{3,40}" required placeholder="ex.: ana.silva" /></label><label>Senha temporária<input name="password" type="password" required minLength={6} maxLength={128} autoComplete="new-password" /><small>Pelo menos 6 caracteres, inclusive só números; troca obrigatória no primeiro acesso.</small></label><Submit>Criar usuário</Submit></ActionForm></section></div>}
   </Shell>;
 }

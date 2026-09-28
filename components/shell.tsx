@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowLeftRight, ArrowDownLeft, ArrowUpRight, LayoutDashboard, WalletCards, Users, Sparkles, ShieldCheck, LogOut, Settings2, Sprout } from "lucide-react";
+import { ArrowLeftRight, ArrowDownLeft, ArrowUpRight, LayoutDashboard, WalletCards, Users, Sparkles, ShieldCheck, LogOut, Settings2, Sprout, Banknote, Calculator } from "lucide-react";
 import { logoutAction } from "@/app/actions";
 
 const nav = [
@@ -8,6 +8,8 @@ const nav = [
   ["receiving", "A receber", ArrowDownLeft],
   ["debts", "Contas recebidas", ArrowUpRight],
   ["accounts", "Contas e cartões", ArrowLeftRight],
+  ["salary", "Salário", Banknote],
+  ["simulator", "Simulador de compra", Calculator],
   ["assistant", "Assistente IA", Sparkles],
 ] as const;
 export function Shell({ user, active = "overview", children }: { user: { name: string; username: string; admin: boolean }; active?: string; children: React.ReactNode }) {
